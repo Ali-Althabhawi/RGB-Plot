@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RGB 3D Plotter</title>
+    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 40px; }
+        #plot { width: 100%; height: 600px; }
+        .container { max-width: 600px; margin: auto; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h2>RGB 3D Plotter</h2>
+        <form id="imgForm" style="background:#f5f7fa; border-radius:8px; padding:20px; box-shadow:0 2px 8px #0001; margin-bottom:24px; display:flex; gap:16px; align-items:center; justify-content:center;">
+            <input type="file" id="imgInput" accept="image/*" required style="padding:8px; border-radius:4px; border:1px solid #ccc;" />
+            <button type="submit" style="background:#4f8cff; color:white; border:none; border-radius:4px; padding:10px 18px; font-weight:bold; cursor:pointer;">Upload & Plot</button>
+        </form>
+        <div id="plot" style="width:100%; min-height:500px; background:#fff; border-radius:10px; box-shadow:0 2px 12px #0002; margin-bottom:32px;"></div>
+        <div style="width:100%; display:flex; justify-content:center;">
+            <div style="border:1px solid #e0e0e0; border-radius:10px; padding:16px 24px; background:#f9f9fc; box-shadow:0 1px 6px #0001; text-align:center;">
+                <div style="font-size:15px; margin-bottom:10px; font-weight:500; color:#4f8cff;">Original Image</div>
+                <img id="originalImgBox" src="" alt="Original" style="max-width:220px; max-height:220px; display:none; border-radius:8px; box-shadow:0 1px 8px #0001;" />
+            </div>
+        </div>
+    </div>
+    <canvas id="hiddenCanvas" style="display:none;"></canvas>
+    <script>
+    document.getElementById('imgForm').addEventListener('submit', function(e) {
+        e.preventDefault();
+        const file = document.getElementById('imgInput').files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = function(evt) {
+            // Show original image
+            const imgBox = document.getElementById('originalImgBox');
+            imgBox.src = evt.target.result;
+            imgBox.style.display = 'block';
+
+            const img = new Image();
+            img.onload = function() {
+                const canvas = document.getElementById('hiddenCanvas');
+                canvas.width = img.width;
+                canvas.height = img.height;
+                const ctx = canvas.getContext('2d');
+                ctx.drawImage(img, 0, 0);
+                const imageData = ctx.getImageData(0, 0, img.width, img.height).data;
+                const totalPixels = img.width * img.height;
+                const maxSamples = 15000;
+                let sampledIndices = [];
+                if (totalPixels > maxSamples) {
+                    let indices = Array.from({length: totalPixels}, (_, i) => i);
+                    for (let i = indices.length - 1; i > 0; i--) {
+                        const j = Math.floor(Math.random() * (i + 1));
+                        [indices[i], indices[j]] = [indices[j], indices[i]];
+                    }
+                    sampledIndices = indices.slice(0, maxSamples);
+                } else {
+                    sampledIndices = Array.from({length: totalPixels}, (_, i) => i);
+                }
+                let r = [], g = [], b = [];
+                for (let idx of sampledIndices) {
+                    let i = idx * 4;
+                    r.push(imageData[i] / 255);
+                    g.push(imageData[i+1] / 255);
+                    b.push(imageData[i+2] / 255);
+                }
+                plotRGB(r, g, b);
+            };
+            img.src = evt.target.result;
+        };
+        reader.readAsDataURL(file);
+    });
+
+    function plotRGB(r, g, b) {
+        const trace = {
+            x: r,
+            y: g,
+            z: b,
+            mode: 'markers',
+            type: 'scatter3d',
+            marker: {
+                size: 2.5,
+                color: r.map((_, i) => `rgb(${Math.round(r[i]*255)},${Math.round(g[i]*255)},${Math.round(b[i]*255)})`),
+                opacity: 0.85,
+                line: { width: 0 }
+            }
+        };
+        const layout = {
+            paper_bgcolor: '#f5f7fa',
+            plot_bgcolor: '#fff',
+            scene: {
+                xaxis: {
+                    title: 'Red (0-1)',
+                    backgroundcolor: '#ffeaea',
+                    gridcolor: '#ffcccc',
+                    zerolinecolor: '#ff8888',
+                    titlefont: { color: '#d32f2f', size: 16 },
+                },
+                yaxis: {
+                    title: 'Green (0-1)',
+                    backgroundcolor: '#eaffea',
+                    gridcolor: '#ccffcc',
+                    zerolinecolor: '#88ff88',
+                    titlefont: { color: '#388e3c', size: 16 },
+                },
+                zaxis: {
+                    title: 'Blue (0-1)',
+                    backgroundcolor: '#eaeaff',
+                    gridcolor: '#ccccff',
+                    zerolinecolor: '#8888ff',
+                    titlefont: { color: '#1976d2', size: 16 },
+                },
+                camera: {
+                    eye: { x: 1.5, y: 1.5, z: 1.5 }
+                },
+            },
+            margin: { l: 0, r: 0, b: 0, t: 0 },
+            font: { family: 'Arial, sans-serif', size: 14, color: '#333' },
+        };
+        Plotly.newPlot('plot', [trace], layout, {responsive:true});
+    }
+    </script>
+</html>
